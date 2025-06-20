@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 LinkBrain Prompt Engineering QA Studio v2.0</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-okaidia.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/autoloader/prism-autoloader.min.js"></script>
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .version-card {
+            transition: all 0.3s ease;
+        }
+        
+        .version-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .neo4j-connected {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+        
+        .neo4j-disconnected {
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+        }
+        
+        .linkbrain-card {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+        
+        .prompt-editor {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        
+        .batch-progress {
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out;
+        }
+        
+        .cypher-result-table {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .cypher-result-table table {
+            font-size: 0.875rem;
+        }
+        
+        .agent-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin: 2px;
+        }
+        
+        .agent-linkbrain {
+            background: #8b5cf6;
+            color: white;
+        }
+        
+        .agent-analysis {
+            background: #06b6d4;
+            color: white;
+        }
+        
+        .agent-supervisor {
+            background: #f59e0b;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 min-h-screen text-white">
+    <!-- 헤더 -->
+    <header class="glass-effect p-4 mb-8">
+        <div class="container mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold">🧠 LinkBrain QA Studio v2.0</h1>
+                <p class="text-sm text-gray-300">Neo4j + Multi-Agent + Batch Testing</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- Neo4j 상태 -->
+                <div id="neo4j-status" class="neo4j-disconnected px-3 py-1 rounded-lg text-xs font-medium">
+                    🔴 Neo4j 연결 확인 중...
+                </div>
+                <button id="connect-neo4j-btn" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg transition-colors">
+                    🔗 Neo4j 연결
+                </button>
+                <button id="new-prompt-btn" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg transition-colors">
+                    ➕ 새 프롬프트
+                </button>
+                <button id="linkbrain-templates-btn" class="linkbrain-card px-4 py-2 rounded-lg transition-colors">
+                    🧠 LinkBrain 템플릿
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="container mx-auto px-4">
+        
+        <!-- LinkBrain 템플릿 질문 모달 -->
+        <div id="linkbrain-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="glass-effect p-8 rounded-xl max-w-4xl w-full max-h-screen overflow-y-auto">
+                <h2 class="text-2xl font-bold mb-6">🧠 LinkBrain 템플릿 질문들</h2>
+                <div id="linkbrain-questions" class="space-y-3 mb-6">
+                    <!-- 질문들이 동적으로 로드됩니다 -->
+                </div>
+                <div class="flex justify-between">
+                    <button id="batch-test-btn" class="bg-purple-500 hover:bg-purple-600 px-6 py-2 rounded-lg transition-colors">
+                        🚀 배치 테스트 실행
+                    </button>
+                    <button id="close-linkbrain-modal" class="bg-gray-500 hover:bg-gray-600 px-6 py-2 rounded-lg transition-colors">
+                        닫기
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 프롬프트 생성/편집 모달 -->
+        <div id="prompt-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="glass-effect p-8 rounded-xl max-w-4xl w-full max-h-screen overflow-y-auto">
+                <h2 class="text-2xl font-bold mb-6">프롬프트 생성/편집</h2>
+                <form id="prompt-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">프롬프트 이름</label>
+                        <input type="text" id="prompt-name" class="w-full p-3 bg-gray-800 rounded-lg border border-gray-600 text-white" placeholder="예: LinkBrain Agent v2.0">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">설명</label>
+                        <input type="text" id="prompt-description" class="w-full p-3 bg-gray-800 rounded-lg border border-gray-600 text-white" placeholder="프롬프트에 대한 간단한 설명">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">프롬프트 타입</label>
+                        <select id="prompt-type" class="w-full p-3 bg-gray-800 rounded-lg border border-gray-600 text-white">
+                            <option value="simple">Simple (OpenAI Direct)</option>
+                            <option value="linkbrain">LinkBrain (Neo4j + Multi-Agent)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">프롬프트 내용</label>
+                        <textarea id="prompt-content" class="w-full h-64 p-3 bg-gray-800 rounded-lg border border-gray-600 text-white prompt-editor" placeholder="시스템 프롬프트를 입력하세요..."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" id="cancel-prompt" class="bg-gray-500 hover:bg-gray-600 px-6 py-2 rounded-lg transition-colors">취소</button>
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg transition-colors">저장</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 배치 테스트 진행 모달 -->
+        <div id="batch-progress-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="glass-effect p-8 rounded-xl max-w-2xl w-full">
+                <h2 class="text-2xl font-bold mb-6">🚀 배치 테스트 실행 중...</h2>
+                <div class="mb-4">
+                    <div class="bg-gray-800 rounded-lg h-4 overflow-hidden">
+                        <div id="batch-progress-bar" class="batch-progress bg-gradient-to-r from-purple-500 to-blue-500 h-full"></div>
+                    </div>
+                </div>
+                <div id="batch-current-question" class="text-sm text-gray-300 mb-4">
+                    진행 중인 질문: 초기화 중...
+                </div>
+                <div id="batch-results-preview" class="bg-gray-800 p-4 rounded-lg h-64 overflow-y-auto">
+                    <div class="text-gray-400">결과가 여기에 표시됩니다...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 버전 목록 -->
+        <div id="versions-section" class="mb-8">
+            <h2 class="text-2xl font-bold mb-6">📋 프롬프트 버전</h2>
+            <div id="versions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- 버전 카드들이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
+
+        <!-- 테스트 섹션 -->
+        <div id="test-section" class="glass-effect p-6 rounded-xl mb-8 hidden">
+            <h2 class="text-2xl font-bold mb-6">🧪 프롬프트 테스트</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                    <form id="test-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">선택된 프롬프트</label>
+                            <div id="selected-prompt-info" class="bg-gray-800 p-3 rounded-lg border border-gray-600">
+                                선택된 프롬프트가 없습니다
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">실행 타입</label>
+                            <select id="execution-type" class="w-full p-3 bg-gray-800 rounded-lg border border-gray-600 text-white">
+                                <option value="simple">Simple (OpenAI Direct)</option>
+                                <option value="linkbrain">LinkBrain (Neo4j + Multi-Agent)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">테스트 질문</label>
+                            <textarea id="test-question" class="w-full h-32 p-3 bg-gray-800 rounded-lg border border-gray-600 text-white" placeholder="AI에게 물어볼 질문을 입력하세요..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">모델 선택</label>
+                            <select id="model-select" class="w-full p-3 bg-gray-800 rounded-lg border border-gray-600 text-white">
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-green-500 hover:bg-green-600 py-3 rounded-lg transition-colors font-medium">
+                            🚀 테스트 실행
+                        </button>
+                    </form>
+                </div>
+                <div>
+                    <h3 class="text-lg font-medium mb-4">📊 실행 결과</h3>
+                    <div id="test-results" class="bg-gray-800 p-4 rounded-lg border border-gray-600 h-96 overflow-y-auto">
+                        테스트 결과가 여기에 표시됩니다
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 실행 히스토리 -->
+        <div id="history-section" class="glass-effect p-6 rounded-xl hidden">
+            <h2 class="text-2xl font-bold mb-6">📈 실행 히스토리</h2>
+            <div id="execution-history" class="space-y-4">
+                <!-- 실행 히스토리가 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수
+        let currentPromptId = null;
+        let allVersions = [];
+        let linkbrainQuestions = [];
+        let selectedQuestions = [];
+        let neo4jConnected = false;
+
+        // DOM 요소들
+        const newPromptBtn = document.getElementById('new-prompt-btn');
+        const linkbrainTemplatesBtn = document.getElementById('linkbrain-templates-btn');
+        const connectNeo4jBtn = document.getElementById('connect-neo4j-btn');
+        const promptModal = document.getElementById('prompt-modal');
+        const linkbrainModal = document.getElementById('linkbrain-modal');
+        const batchProgressModal = document.getElementById('batch-progress-modal');
+        const promptForm = document.getElementById('prompt-form');
+        const cancelPromptBtn = document.getElementById('cancel-prompt');
+        const versionsGrid = document.getElementById('versions-grid');
+        const testSection = document.getElementById('test-section');
+        const historySection = document.getElementById('history-section');
+        const testForm = document.getElementById('test-form');
+
+        // 이벤트 리스너
+        newPromptBtn.addEventListener('click', () => {
+            promptModal.classList.remove('hidden');
+            promptModal.classList.add('flex');
+        });
+
+        linkbrainTemplatesBtn.addEventListener('click', async () => {
+            await loadLinkbrainQuestions();
+            linkbrainModal.classList.remove('hidden');
+            linkbrainModal.classList.add('flex');
+        });
+
+        connectNeo4jBtn.addEventListener('click', async () => {
+            await connectToNeo4j();
+        });
+
+        cancelPromptBtn.addEventListener('click', () => {
+            promptModal.classList.add('hidden');
+            promptModal.classList.remove('flex');
+        });
+
+        document.getElementById('close-linkbrain-modal').addEventListener('click', () => {
+            linkbrainModal.classList.add('hidden');
+            linkbrainModal.classList.remove('flex');
+        });
+
+        document.getElementById('batch-test-btn').addEventListener('click', async () => {
+            await runBatchTest();
+        });
+
+        promptForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await createPromptVersion();
+        });
+
+        testForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await runTest();
+        });
+
+        // 함수들
+        async function checkNeo4jStatus() {
+            try {
+                const response = await fetch('/neo4j-status');
+                const status = await response.json();
+                updateNeo4jStatus(status.connected);
+            } catch (error) {
+                console.error('Neo4j 상태 확인 실패:', error);
+                updateNeo4jStatus(false);
+            }
+        }
+
+        function updateNeo4jStatus(connected) {
+            const statusEl = document.getElementById('neo4j-status');
+            neo4jConnected = connected;
+            
+            if (connected) {
+                statusEl.className = 'neo4j-connected px-3 py-1 rounded-lg text-xs font-medium';
+                statusEl.textContent = '🟢 Neo4j 연결됨';
+            } else {
+                statusEl.className = 'neo4j-disconnected px-3 py-1 rounded-lg text-xs font-medium';
+                statusEl.textContent = '🔴 Neo4j 연결 안됨';
+            }
+        }
+
+        async function connectToNeo4j() {
+            try {
+                connectNeo4jBtn.textContent = '🔄 연결 중...';
+                connectNeo4jBtn.disabled = true;
+
+                const response = await fetch('/initialize-neo4j', { method: 'POST' });
+                const result = await response.json();
+                
+                updateNeo4jStatus(result.connected);
+                
+                if (result.connected) {
+                    alert('Neo4j 연결 성공! 이제 LinkBrain 기능을 사용할 수 있습니다.');
+                } else {
+                    alert('Neo4j 연결 실패. 기본 OpenAI 모드로 사용하세요.');
+                }
+            } catch (error) {
+                console.error('Neo4j 연결 실패:', error);
+                alert('Neo4j 연결 중 오류가 발생했습니다.');
+            } finally {
+                connectNeo4jBtn.textContent = '🔗 Neo4j 연결';
+                connectNeo4jBtn.disabled = false;
+            }
+        }
+
+        async function loadLinkbrainQuestions() {
+            try {
+                const response = await fetch('/linkbrain-questions');
+                const data = await response.json();
+                linkbrainQuestions = data.questions;
+                renderLinkbrainQuestions();
+            } catch (error) {
+                console.error('LinkBrain 질문 로드 실패:', error);
+            }
+        }
+
+        function renderLinkbrainQuestions() {
+            const questionsEl = document.getElementById('linkbrain-questions');
+            questionsEl.innerHTML = '';
+            
+            linkbrainQuestions.forEach((question, index) => {
+                const questionEl = document.createElement('label');
+                questionEl.className = 'flex items-start space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gray-800 transition-colors';
+                questionEl.innerHTML = `
+                    <input type="checkbox" value="${index}" class="question-checkbox mt-1">
+                    <span class="text-sm">${question}</span>
+                `;
+                questionsEl.appendChild(questionEl);
+            });
+        }
+
+        async function runBatchTest() {
+            const checkboxes = document.querySelectorAll('.question-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('최소 하나의 질문을 선택해주세요.');
+                return;
+            }
+
+            if (!currentPromptId) {
+                alert('먼저 프롬프트를 선택해주세요.');
+                return;
+            }
+
+            selectedQuestions = Array.from(checkboxes).map(cb => linkbrainQuestions[parseInt(cb.value)]);
+            
+            linkbrainModal.classList.add('hidden');
+            batchProgressModal.classList.remove('hidden');
+            batchProgressModal.classList.add('flex');
+
+            try {
+                const formData = new FormData();
+                formData.append('prompt_version_id', currentPromptId);
+                formData.append('questions', JSON.stringify(selectedQuestions));
+                formData.append('execution_type', neo4jConnected ? 'linkbrain' : 'simple');
+
+                // 진행 상황 시뮬레이션
+                let progress = 0;
+                const progressBar = document.getElementById('batch-progress-bar');
+                const currentQuestionEl = document.getElementById('batch-current-question');
+                const resultsPreview = document.getElementById('batch-results-preview');
+
+                const interval = setInterval(() => {
+                    progress += Math.random() * 10;
+                    if (progress > 90) progress = 90;
+                    progressBar.style.width = progress + '%';
+                    
+                    const currentIndex = Math.floor(progress / 100 * selectedQuestions.length);
+                    if (currentIndex < selectedQuestions.length) {
+                        currentQuestionEl.textContent = `진행 중인 질문 ${currentIndex + 1}/${selectedQuestions.length}: ${selectedQuestions[currentIndex].substring(0, 50)}...`;
+                    }
+                }, 500);
+
+                const response = await fetch('/batch-test', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(interval);
+                progressBar.style.width = '100%';
+
+                if (response.ok) {
+                    const result = await response.json();
+                    displayBatchResults(result);
+                } else {
+                    const error = await response.json();
+                    alert(`배치 테스트 실행 중 오류: ${error.detail}`);
+                }
+            } catch (error) {
+                console.error('배치 테스트 실행 실패:', error);
+                alert('배치 테스트 실행 중 오류가 발생했습니다.');
+            } finally {
+                setTimeout(() => {
+                    batchProgressModal.classList.add('hidden');
+                    batchProgressModal.classList.remove('flex');
+                }, 2000);
+            }
+        }
+
+        function displayBatchResults(result) {
+            const resultsPreview = document.getElementById('batch-results-preview');
+            resultsPreview.innerHTML = `
+                <div class="space-y-4">
+                    <div class="bg-green-900 p-3 rounded-lg">
+                        <div class="text-green-300 font-medium">✅ 배치 테스트 완료</div>
+                        <div class="text-xs text-gray-400 mt-1">
+                            총 실행 시간: ${result.total_execution_time.toFixed(2)}초 | 
+                            질문 수: ${result.questions.length}개 | 
+                            사용된 에이전트: ${result.agents_used}
+                        </div>
+                    </div>
+                    ${result.questions.map((question, index) => `
+                        <div class="bg-gray-900 p-3 rounded-lg">
+                            <div class="text-yellow-300 text-sm font-medium mb-2">Q${index + 1}: ${question.substring(0, 80)}...</div>
+                            <div class="text-gray-300 text-sm">${result.responses[index].substring(0, 150)}...</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function loadVersions() {
+            try {
+                const response = await fetch('/versions');
+                allVersions = await response.json();
+                renderVersions();
+            } catch (error) {
+                console.error('Error loading versions:', error);
+            }
+        }
+
+        function renderVersions() {
+            versionsGrid.innerHTML = '';
+            allVersions.forEach(version => {
+                const versionCard = createVersionCard(version);
+                versionsGrid.appendChild(versionCard);
+            });
+        }
+
+        function createVersionCard(version) {
+            const card = document.createElement('div');
+            const isLinkbrain = version.prompt_type === 'linkbrain';
+            card.className = `version-card glass-effect p-6 rounded-xl cursor-pointer fade-in-up ${isLinkbrain ? 'border-purple-500' : ''}`;
+            
+            card.innerHTML = `
+                <div class="mb-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-xl font-bold text-yellow-300">${version.name}</h3>
+                        <span class="text-xs px-2 py-1 rounded ${isLinkbrain ? 'bg-purple-600' : 'bg-blue-600'}">${version.prompt_type.toUpperCase()}</span>
+                    </div>
+                    <p class="text-sm text-gray-300">${version.description || '설명 없음'}</p>
+                </div>
+                <div class="text-xs text-gray-400 space-y-1">
+                    <div>🏷️ ${version.version}</div>
+                    <div>📅 ${new Date(version.created_at).toLocaleString('ko-KR')}</div>
+                    <div>🔍 ${version.content_hash}</div>
+                </div>
+                <div class="mt-4 flex justify-between">
+                    <button class="test-btn bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded text-sm transition-colors">
+                        테스트
+                    </button>
+                    <button class="history-btn bg-purple-500 hover:bg-purple-600 px-3 py-1 rounded text-sm transition-colors">
+                        히스토리
+                    </button>
+                </div>
+            `;
+
+            // 테스트 버튼 이벤트
+            card.querySelector('.test-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectVersionForTest(version);
+            });
+
+            // 히스토리 버튼 이벤트
+            card.querySelector('.history-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                showExecutionHistory(version.id);
+            });
+
+            return card;
+        }
+
+        function selectVersionForTest(version) {
+            currentPromptId = version.id;
+            document.getElementById('selected-prompt-info').innerHTML = `
+                <strong>${version.name}</strong><br>
+                <small class="text-gray-400">${version.version}</small><br>
+                <span class="text-xs px-2 py-1 rounded ${version.prompt_type === 'linkbrain' ? 'bg-purple-600' : 'bg-blue-600'} mt-1 inline-block">
+                    ${version.prompt_type.toUpperCase()}
+                </span>
+            `;
+            
+            // 실행 타입을 프롬프트 타입에 맞게 설정
+            const executionTypeSelect = document.getElementById('execution-type');
+            if (version.prompt_type === 'linkbrain') {
+                executionTypeSelect.value = 'linkbrain';
+            } else {
+                executionTypeSelect.value = 'simple';
+            }
+            
+            testSection.classList.remove('hidden');
+            testSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function createPromptVersion() {
+            const formData = new FormData();
+            formData.append('name', document.getElementById('prompt-name').value);
+            formData.append('content', document.getElementById('prompt-content').value);
+            formData.append('description', document.getElementById('prompt-description').value);
+            formData.append('prompt_type', document.getElementById('prompt-type').value);
+
+            try {
+                const response = await fetch('/versions', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    promptModal.classList.add('hidden');
+                    promptForm.reset();
+                    await loadVersions();
+                } else {
+                    alert('프롬프트 저장 중 오류가 발생했습니다.');
+                }
+            } catch (error) {
+                console.error('Error creating prompt version:', error);
+                alert('프롬프트 저장 중 오류가 발생했습니다.');
+            }
+        }
+
+        async function runTest() {
+            if (!currentPromptId) {
+                alert('먼저 프롬프트를 선택해주세요.');
+                return;
+            }
+
+            const question = document.getElementById('test-question').value;
+            const model = document.getElementById('model-select').value;
+            const executionType = document.getElementById('execution-type').value;
+
+            if (!question.trim()) {
+                alert('질문을 입력해주세요.');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<div class="text-center">🔄 테스트 실행 중...</div>';
+
+            const formData = new FormData();
+            formData.append('prompt_version_id', currentPromptId);
+            formData.append('question', question);
+            formData.append('model', model);
+            formData.append('execution_type', executionType);
+
+            try {
+                const response = await fetch('/test', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    displayTestResult(result);
+                } else {
+                    const error = await response.json();
+                    resultsDiv.innerHTML = `<div class="text-red-400">❌ 오류: ${error.detail}</div>`;
+                }
+            } catch (error) {
+                console.error('Error running test:', error);
+                resultsDiv.innerHTML = '<div class="text-red-400">❌ 테스트 실행 중 오류가 발생했습니다.</div>';
+            }
+        }
+
+        function displayTestResult(result) {
+            const resultsDiv = document.getElementById('test-results');
+            
+            // 에이전트 배지 생성
+            const agentBadges = result.agents_used ? 
+                result.agents_used.split(', ').map(agent => {
+                    const badgeClass = agent.includes('linkbrain') ? 'agent-linkbrain' :
+                                     agent.includes('analysis') ? 'agent-analysis' :
+                                     agent.includes('supervisor') ? 'agent-supervisor' : 'bg-gray-600';
+                    return `<span class="agent-badge ${badgeClass}">${agent}</span>`;
+                }).join('') : '';
+
+            resultsDiv.innerHTML = `
+                <div class="space-y-4">
+                    <div class="bg-green-900 p-3 rounded-lg">
+                        <div class="text-sm text-green-300 mb-2">✅ 실행 완료</div>
+                        <div class="text-xs text-gray-400 mb-2">
+                            실행 시간: ${result.execution_time.toFixed(2)}초 | 
+                            토큰: ${result.tokens_used} | 
+                            모델: ${result.model_used} |
+                            타입: ${result.execution_type}
+                        </div>
+                        <div class="text-xs">
+                            사용된 에이전트: ${agentBadges || '없음'}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium mb-2">🤖 AI 응답:</div>
+                        <div class="bg-gray-900 p-3 rounded-lg whitespace-pre-wrap cypher-result-table">${formatResponse(result.response)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatResponse(response) {
+            // Cypher 쿼리 결과 테이블 형식 감지 및 포맷팅
+            if (response.includes('|') && response.includes('----')) {
+                return `<pre class="text-xs">${response}</pre>`;
+            }
+            return response;
+        }
+
+        async function showExecutionHistory(versionId) {
+            try {
+                const response = await fetch(`/executions/${versionId}`);
+                const executions = await response.json();
+                
+                const historyDiv = document.getElementById('execution-history');
+                historyDiv.innerHTML = '';
+
+                if (executions.length === 0) {
+                    historyDiv.innerHTML = '<div class="text-gray-400">실행 히스토리가 없습니다.</div>';
+                } else {
+                    executions.forEach(execution => {
+                        const historyItem = createHistoryItem(execution);
+                        historyDiv.appendChild(historyItem);
+                    });
+                }
+
+                historySection.classList.remove('hidden');
+                historySection.scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                console.error('Error loading execution history:', error);
+            }
+        }
+
+        function createHistoryItem(execution) {
+            const item = document.createElement('div');
+            item.className = 'glass-effect p-4 rounded-lg';
+            
+            const agentBadges = execution.agents_used ? 
+                execution.agents_used.split(', ').map(agent => {
+                    const badgeClass = agent.includes('linkbrain') ? 'agent-linkbrain' :
+                                     agent.includes('analysis') ? 'agent-analysis' :
+                                     agent.includes('supervisor') ? 'agent-supervisor' : 'bg-gray-600';
+                    return `<span class="agent-badge ${badgeClass}">${agent}</span>`;
+                }).join('') : '';
+
+            item.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-sm font-medium text-yellow-300 mb-2">📝 질문:</div>
+                        <div class="bg-gray-800 p-3 rounded-lg text-sm">${execution.question}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-green-300 mb-2">🤖 응답:</div>
+                        <div class="bg-gray-800 p-3 rounded-lg text-sm max-h-32 overflow-y-auto">${execution.response.substring(0, 300)}${execution.response.length > 300 ? '...' : ''}</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-gray-400 flex justify-between items-center">
+                    <span>📅 ${new Date(execution.created_at).toLocaleString('ko-KR')}</span>
+                    <div class="flex items-center space-x-2">
+                        <span>⏱️ ${execution.execution_time.toFixed(2)}초</span>
+                        <span>🎯 ${execution.tokens_used} 토큰</span>
+                        <span>🤖 ${execution.model_used}</span>
+                        <span class="px-2 py-1 rounded text-xs ${execution.execution_type === 'linkbrain' ? 'bg-purple-600' : 'bg-blue-600'}">${execution.execution_type}</span>
+                    </div>
+                </div>
+                ${execution.agents_used ? `<div class="mt-2 text-xs">사용된 에이전트: ${agentBadges}</div>` : ''}
+            `;
+            return item;
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkNeo4jStatus();
+            await loadVersions();
+        });
+    </script>
+</body>
+</html> 

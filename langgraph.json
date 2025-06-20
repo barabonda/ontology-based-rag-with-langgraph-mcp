@@ -1,0 +1,15 @@
+{
+  "dockerfile_lines": [
+    "RUN pip install --upgrade pip",
+    "RUN export TMPDIR='/var/tmp'"
+  ],
+  "graphs": {
+    "agent": "./example.py:graph"
+  },
+  "env": "./.env",
+  "python_version": "3.11",
+  "dependencies": [
+    "."
+  ],
+  "port": 2025
+} 

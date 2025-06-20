@@ -1,0 +1,14 @@
+langchain-core>=0.1.0
+langchain-openai>=0.0.1
+langgraph>=0.0.36
+neo4j>=5.14.0
+mcp>=0.0.1
+python-dotenv>=1.0.0
+streamlit==1.35.0
+pandas==2.2.0
+plotly==5.19.0
+langchain-mcp-adapters>=0.1.0
+mcp-neo4j-cypher>=0.1.0
+langgraph-supervisor>=0.1.0
+requests>=2.31.0
+fastmcp>=0.1.1 
